@@ -4,14 +4,15 @@ using System.Text.Json;
 
 namespace newscleanerconsole.Services;
 
-public class NewsParser
+public class NewsParser : INewsParser
 {
     private const string BaseUrl = "https://brokennews.net";
-    private readonly string _logPath;
+    private readonly IFileLogger _logger;
 
-    public NewsParser(string logPath)
+    public NewsParser(
+        IFileLogger logger )
     {
-        _logPath = logPath;
+        _logger = logger;
     }
 
     public List<NewsItem> Parse(string htmlPath)
@@ -21,16 +22,16 @@ public class NewsParser
         var newsNodes = doc.DocumentNode.SelectNodes("//li[contains(@class, 'news-item')]");
         var newsList = new List<NewsItem>();
 
-        if (newsNodes == null) return newsList;
+        if (newsNodes is null) return newsList;
 
         foreach (var node in newsNodes)
         {
             try
             {
-                // Пропуск баннеров, футеров и т.д.
+                // Пропуск баннеров, футеров итд
                 if (node.InnerHtml.Contains("ad-banner") || node.InnerHtml.Contains("footer"))
                 {
-                    Log("Skipped junk block.");
+                    _logger.Log("Skipped junk block.");
                     continue;
                 }
 
@@ -39,7 +40,7 @@ public class NewsParser
 
                 if (timeNode == null || titleNode == null)
                 {
-                    Log("Skipped block: missing <time> or <a>.");
+                    _logger.Log("Skipped block: missing <time> or <a>.");
                     continue;
                 }
 
@@ -49,7 +50,7 @@ public class NewsParser
 
                 if (string.IsNullOrEmpty(date) || string.IsNullOrEmpty(url) || string.IsNullOrWhiteSpace(title))
                 {
-                    Log($"Skipped block: invalid data (Date: '{date}', Url: '{url}', Title: '{title}').");
+                    _logger.Log($"Skipped block: invalid data (Date: '{date}', Url: '{url}', Title: '{title}').");
                     continue;
                 }
 
@@ -62,15 +63,10 @@ public class NewsParser
             }
             catch (Exception ex)
             {
-                Log("Error parsing block: " + ex.Message);
+                _logger.Log("Error parsing block: " + ex.Message);
             }
         }
 
         return newsList;
-    }
-
-    private void Log(string message)
-    {
-        File.AppendAllText(_logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
     }
 }
